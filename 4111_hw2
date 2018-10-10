@@ -1,0 +1,217 @@
+import json
+
+from flask import Flask
+from flask import request
+
+import rdbquery
+
+
+app = Flask(__name__)
+
+'''
+Base resource
+
+POST: /api/<resource> creates (inserts) a new sub-resource (row) in the containing resource (table).
+POST: /api/players creates a new player (inserts into table).
+
+GET: /api/<resource>[query_expression],[&field_expression]
+GET: /api/players?nameLast=Williams&nameFirst=Ted&fields=playerID,birthCountry
+
+'''
+
+def parse_qf(args):
+    temp = dict(args)
+    if "fields" in args:
+        fields = args["fields"]
+        del temp["fields"]
+    else:
+        fields = None
+
+    if "limit" in args:
+        limit = args["limit"]
+        del temp["limit"]
+    else:
+        limit = "10"
+
+    if "offset" in args:
+        offset = args["offset"]
+        del temp["offset"]
+    else:
+        offset = "0"
+
+    return temp,fields,offset,limit
+
+
+@app.route('/api/<resource>/', methods=['GET', 'POST'])
+def get_resource(resource):
+    if request.method == 'GET':
+        if request.args is not None:
+            # request.args will return a dict of all the things behind?
+            req = request.args
+            temp = parse_qf(req)
+            
+            limit = " limit "+temp[2] + "," + temp[3]
+            result = rdbquery.find_by_template(resource,temp[0],temp[1],limit)
+            url = request.url
+            curr_url = url.split("offset")[0]
+            offset = int(temp[2]) + int(temp[3])
+            next_url = curr_url + "&offset=" + str(offset) + "&limit="+temp[3]
+            curr_url = curr_url + "&offset="+temp[2] + "&limit="+temp[3]
+            result.append({"curr_url":curr_url})
+            result.append({"next_url":next_url})
+
+        else:
+            result = None
+
+        if result:
+            return json.dumps(result), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        else:
+            return "NOT FOUND", 404
+
+    elif request.method == 'POST':
+        res = request.data
+        data = json.loads(res)
+        print(data)
+        print(data["playerID"])
+
+        rdbquery.insert(resource,data)
+        return "Insertion done"
+
+
+@app.route('/api/<resource>/<primary_key>/', methods=['GET', 'PUT','DELETE'])
+def specific_resource(resource,primary_key):
+
+    value = primary_key
+    p_values = value.split('_')
+    args = request.args
+
+    fields = args["fields"] if "fields" in args else None
+
+    if request.method == 'GET':
+        result = rdbquery.find_by_primary_key(resource, p_values, fields)
+        if result:
+            return json.dumps(result), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        else:
+            return "NOT FOUND", 404
+
+    elif request.method == 'PUT':
+        res = request.data
+        data = json.loads(res)
+        rdbquery.update_bypk(resource,p_values,data)
+        message = "update done"
+        return json.dumps(message), 200, {'Content-Type': 'application/json; charset=utf-8'}
+
+    elif request.method == 'DELETE':
+
+        rdbquery.delete_bypk(resource, p_values)
+        message = "Deleted"
+        return json.dumps(message), 200, {'Content-Type': 'application/json; charset=utf-8'}
+
+
+@app.route('/api/<resource>/<primary_key>/<related_resource>/', methods=['GET', 'POST'])
+def dependent_resource(resource,primary_key,related_resource):
+    #http://127.0.0.1:5000/api/batting/willite01_BOS_1970_1/people
+    #http://127.0.0.1:5000/api/people/willite01/batting
+    if request.method == 'GET':
+        value = primary_key
+        p_values = value.split('_')
+
+        args = request.args
+        qf = parse_qf(args)
+        result = rdbquery.find_by_relation(resource, p_values, related_resource, qf[0],qf[1])
+        if result:
+            return json.dumps(result), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        else:
+            return "NOT FOUND", 404
+    elif request.method == 'POST':
+        value = primary_key
+        p_values = value.split('_')
+        res = request.data
+        data = json.loads(res)
+        rdbquery.insert_by_relation(resource,p_values,related_resource,data)
+        return "Insertion done"
+
+@app.route('/api/teammates/<playerID>/')
+    #IDs, names, first year, last year and count of seasons
+def get_teammates(playerID):
+    req = request.args
+    temp = parse_qf(req)
+    limit = " limit " + temp[2] + "," + temp[3]
+
+    result = rdbquery.custom1(playerID,limit)
+
+    if result:
+        url = request.url
+        if "offset" in url:
+            temp_url = url.split("offset")[0]
+            offset = int(temp[2]) + int(temp[3])
+            curr_url = url
+            next_url = temp_url + "offset=" + str(offset) + "&limit=" + temp[3]
+            # curr_url = curr_url + "?offset=" + temp[2] + "&limit=" + temp[3]
+            result.append({"curr_url": curr_url})
+            result.append({"next_url": next_url})
+        else:
+            offset = int(temp[2]) + int(temp[3])
+            next_url = url + "?offset=" + str(offset) + "&limit=" + temp[3]
+            curr_url = url + "?offset=" + temp[2] + "&limit=" + temp[3]
+            result.append({"curr_url": curr_url})
+            result.append({"next_url": next_url})
+        return json.dumps(result), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    else:
+        return "NOT FOUND", 404
+
+@app.route('/api/people/<playerid>/career_stats/')
+    #IDs, names, first year, last year and count of seasons
+def get_career_stats(playerid):
+    req = request.args
+    temp = parse_qf(req)
+    limit = " limit " + temp[2] + "," + temp[3]
+    result = rdbquery.custom2(playerid,limit)
+    if result:
+        url = request.url
+        if "offset" in url:
+            temp_url = url.split("offset")[0]
+            offset = int(temp[2]) + int(temp[3])
+            curr_url = url
+            next_url = temp_url + "offset=" + str(offset) + "&limit=" + temp[3]
+            result.append({"curr_url": curr_url})
+            result.append({"next_url": next_url})
+        else:
+            offset = int(temp[2]) + int(temp[3])
+            next_url = url + "?offset=" + str(offset) + "&limit=" + temp[3]
+            curr_url = url + "?offset=" + temp[2] + "&limit=" + temp[3]
+            result.append({"curr_url": curr_url})
+            result.append({"next_url": next_url})
+
+        return json.dumps(result), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    else:
+        return "NOT FOUND", 404
+
+@app.route('/api/roster/')
+    #IDs, names, first year, last year and count of seasons
+def get_roster():
+    q = request.args
+    team = q['teamid']
+    year = q['yearid']
+    temp = parse_qf(q)
+    limit = " limit " + temp[2] + "," + temp[3]
+    result = rdbquery.custom3(team,year,limit)
+    if result:
+        url = request.url
+        curr_url = url.split("&offset")[0]
+        offset = int(temp[2]) + int(temp[3])
+        next_url = curr_url + "&offset=" + str(offset) + "&limit=" + temp[3]
+        curr_url = curr_url + "&offset=" + temp[2] + "&limit=" + temp[3]
+
+        result.append({"curr_url": curr_url})
+        result.append({"next_url": next_url})
+
+
+        return json.dumps(result), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    else:
+        return "NOT FOUND", 404
+
+
+if __name__ == '__main__':
+    app.debug = True
+    app.run()
