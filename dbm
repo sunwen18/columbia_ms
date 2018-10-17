@@ -1,0 +1,104 @@
+Problem1
+select playerID
+FROM HallOfFame
+where playerID not in (select playerID from Appearances)
+  and playerID not in (select playerID from Managers);
+
+select playerID,nameLast,nameFirst
+FROM People
+where playerID in (select playerID from People)
+    and playerID not in (select playerID from Appearances)
+  and playerID not in (select playerID from Managers);
+
+select playerID,votedBy
+FROM HallOfFame
+where playerID not in (select playerID from Appearances)
+  and playerID not in (select playerID from Managers);
+
+select a.playerID,a.nameFirst,a.nameLast,b.votedBy
+from (
+    select playerID,nameLast,nameFirst
+FROM People
+where playerID in (select playerID from People)
+    and playerID not in (select playerID from Appearances)
+  and playerID not in (select playerID from Managers)
+    ) as a
+join (
+    select playerID,votedBy
+FROM HallOfFame
+where playerID not in (select playerID from Appearances)
+  and playerID not in (select playerID from Managers)
+    ) as b
+on a.playerID = b.playerID
+limit 10;
+
+
+Problem 2
+select *
+from (
+    select *
+from (
+    select playerid, sum(h) as total_hits, sum(AB) as total_at_bats,sum(h)/sum(AB) as career_average,sum(HR) as total_hr
+from Batting
+group by playerID
+    ) as a
+where a.total_hr > 500 and a.career_average > 0.340
+         ) as aa
+left join
+    (
+       SELECT *
+FROM(
+    select sum(W) as total_pitching_wins,playerID
+from Pitching
+group by playerID
+    ) as a
+WHERE
+    total_pitching_wins >= 350
+        ) as bb
+on aa.playerID = bb.playerID
+
+union
+
+select *
+from (
+    select *
+from (
+    select playerid, sum(h) as total_hits, sum(AB) as total_at_bats,sum(h)/sum(AB) as career_average,sum(HR) as total_hr
+from Batting
+group by playerID
+    ) as a
+where a.total_hr > 500 and a.career_average > 0.340
+         ) as aa
+right join
+    (
+       SELECT *
+FROM(
+    select sum(W) as total_pitching_wins,playerID
+from Pitching
+group by playerID
+    ) as a
+WHERE
+    total_pitching_wins >= 350
+        ) as bb
+on aa.playerID = bb.playerID;
+
+Problem3
+create view people_summary as
+select playerID,nameFirst,nameLast,throws,bats
+FROM People;
+
+create view appearances_summary as
+select playerID,teamID,yearID,G_all,G_batting,G_defense,G_p as g_pitching
+FROM Appearances;
+
+create view batting_summary as
+select playerID,teamID,yearID,h as hits,ab as at_bats,hr as hrs,RBI
+FROM Batting;
+
+create view fielding_summary as
+    select playerID,teamID,yearID,PO as put_outs,a as assists, e as errors
+    from Fielding;
+
+create view pitching_summary as
+    select playerID,teamID,yearID,w as wins, l as loses, g as games, IPOuts as outs_pitched
+    from Pitching;
