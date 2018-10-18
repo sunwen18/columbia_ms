@@ -34,32 +34,19 @@ limit 10;
 
 
 Problem 2
-select *
-from (
-    select *
+
+select playerID,a.total_hits,a.total_at_bats,a.career_average,null as total_pitchingwins
 from (
     select playerid, sum(h) as total_hits, sum(AB) as total_at_bats,sum(h)/sum(AB) as career_average,sum(HR) as total_hr
 from Batting
 group by playerID
     ) as a
 where a.total_hr > 500 and a.career_average > 0.340
-         ) as aa
-left join
-    (
-       SELECT *
-FROM(
-    select sum(W) as total_pitching_wins,playerID
-from Pitching
-group by playerID
-    ) as a
-WHERE
-    total_pitching_wins >= 350
-        ) as bb
-on aa.playerID = bb.playerID
+
 
 union
 
-select *
+select bb.playerID,null as total_hits, null as total_at_bats,null as career_average, bb.total_pitching_wins
 from (
     select *
 from (
