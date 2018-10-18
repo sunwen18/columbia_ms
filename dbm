@@ -102,3 +102,18 @@ create view fielding_summary as
 create view pitching_summary as
     select playerID,teamID,yearID,w as wins, l as loses, g as games, IPOuts as outs_pitched
     from Pitching;
+
+Problem 4
+(select playerID,teamID,yearID,'PLAYER' AS ROLE,sum(G_all) as games,sum(G_p),sum(G_batting),sum(G_defense) as g_fielding,'N/A' as inseason
+from Appearances
+where teamID = 'CHN' and yearID = '1961'
+group by playerID
+)
+
+union
+
+    (select playerID,teamID,yearID,'MANAGER' AS ROLE,G as games,inseason,'N/A'as G_batting, 'N/A' as g_fielding,'N/A' as G_p
+from Managers
+where teamID = 'CHN' and yearID = '1961')
+
+order by ROLE desc , games+0 DESC ;
