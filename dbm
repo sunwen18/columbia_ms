@@ -104,7 +104,9 @@ create view pitching_summary as
     from Pitching;
 
 Problem 4
-(select playerID,teamID,yearID,'PLAYER' AS ROLE,sum(G_all) as games,sum(G_p),sum(G_batting),sum(G_defense) as g_fielding,'N/A' as inseason
+select m.playerID,m.teamID,m.yearID,n.nameLast,n.nameFirst,m.in_season,m.ROLE,m.g_batting,m.g_fielding,m.g_p
+from (
+    (select playerID,teamID,yearID,'PLAYER' AS ROLE,sum(G_all) as games,sum(G_p) as g_p,sum(G_batting) as g_batting,sum(G_defense) as g_fielding,'N/A' as in_season
 from Appearances
 where teamID = 'CHN' and yearID = '1961'
 group by playerID
@@ -112,8 +114,12 @@ group by playerID
 
 union
 
-    (select playerID,teamID,yearID,'MANAGER' AS ROLE,G as games,inseason,'N/A'as G_batting, 'N/A' as g_fielding,'N/A' as G_p
+    (select playerID,teamID,yearID,'MANAGER' AS ROLE,G as games, 'N/A' as g_p,'N/A' as g_batting, 'N/A' as g_fielding,inseason as in_season
 from Managers
 where teamID = 'CHN' and yearID = '1961')
+order by ROLE desc , games+0 DESC
 
-order by ROLE desc , games+0 DESC ;
+         ) as m
+join     (select playerID,namelast, namefirst
+from People) as n
+on m.playerID = n.playerID;
